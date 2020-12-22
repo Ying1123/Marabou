@@ -27,6 +27,7 @@
 
 SmtCore::SmtCore( IEngine *engine )
     : _statistics( NULL )
+    , _influenceForSplitting( NULL )
     , _engine( engine )
     , _needToSplit( false )
     , _constraintForSplitting( NULL )
@@ -129,6 +130,17 @@ void SmtCore::performSplit()
     stateBeforeSplits->_stateId = _stateId;
     ++_stateId;
     _engine->storeState( *stateBeforeSplits, true );
+    if (!_stack.empty())
+    {
+	    stateBeforeSplits->_numDiffPlConstraintsDisabledByValidSplits =
+		    stateBeforeSplits->_numPlConstraintsDisabledByValidSplits -
+		    _stack.back()->_engineState->_numPlConstraintsDisabledByValidSplits;
+    } else
+    {
+	    stateBeforeSplits->_numDiffPlConstraintsDisabledByValidSplits =
+		    stateBeforeSplits->_numPlConstraintsDisabledByValidSplits -
+		    _impliedValidSplitsAtRoot.size();
+    }
 
     SmtStackEntry *stackEntry = new SmtStackEntry;
     // Perform the first split: add bounds and equations
@@ -180,7 +192,8 @@ bool SmtCore::popSplit()
 
     // Remove any entries that have no alternatives
     String error;
-    while ( _stack.back()->_alternativeSplits.empty() )
+    SmtStackEntry *lastEntry = _stack.back();
+    while ( lastEntry->_alternativeSplits.empty() )
     {
         if ( checkSkewFromDebuggingSolution() )
         {
@@ -189,12 +202,20 @@ bool SmtCore::popSplit()
             throw MarabouError( MarabouError::DEBUGGING_ERROR );
         }
 
+	PiecewiseLinearConstraint *lastPLC = (PiecewiseLinearConstraint *) lastEntry->_activeSplit.getSourcePLC();
+	double numFixed = (double)(lastEntry->_engineState->_numDiffPlConstraintsDisabledByValidSplits);
+
         delete _stack.back()->_engineState;
         delete _stack.back();
         _stack.popBack();
 
         if ( _stack.empty() )
             return false;
+
+        _influenceForSplitting->updateTime(lastPLC);
+	_influenceForSplitting->updateSpatial(lastPLC, (PiecewiseLinearConstraint *)_stack.back()->_activeSplit.getSourcePLC(), numFixed);
+
+	lastEntry = _stack.back();
     }
 
     if ( checkSkewFromDebuggingSolution() )
@@ -450,4 +471,9 @@ bool SmtCore::pickSplitPLConstraint()
     if ( _needToSplit )
         _constraintForSplitting = _engine->pickSplitPLConstraint();
     return _constraintForSplitting != NULL;
+}
+
+void SmtCore::setInfleunceForSplitting( BranchingHeuristics *influenceForSplitting )
+{
+    _influenceForSplitting = influenceForSplitting;
 }

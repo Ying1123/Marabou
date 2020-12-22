@@ -22,6 +22,7 @@
 #include "AutoRowBoundTightener.h"
 #include "AutoTableau.h"
 #include "BlandsRule.h"
+#include "BranchingHeuristics.h"
 #include "DantzigsRule.h"
 #include "DegradationChecker.h"
 #include "DivideStrategy.h"
@@ -157,6 +158,8 @@ public:
       Pick the piecewise linear constraint for splitting
     */
     PiecewiseLinearConstraint *pickSplitPLConstraintSnC( SnCDivideStrategy strategy );
+
+    const List<PiecewiseLinearConstraint *> &getPiecewiseLinearConstraints();
 
     /*
       PSA: The following two methods are for DnC only and should be used very
@@ -332,6 +335,11 @@ private:
       Strategy used for internal splitting
     */
     DivideStrategy _splittingStrategy;
+
+    /*
+      The handler for a splitting strategy based on influence.
+    */
+    BranchingHeuristics _influenceForSplitting;
 
     /*
       Disjunction that is used for splitting but doesn't exist in the beginning
@@ -533,6 +541,11 @@ private:
       Extract the satisfying assignment from the MILP solver
     */
     void extractSolutionFromGurobi( InputQuery &inputQuery );
+
+    /*
+      Pick the input variable with the largest score
+    */
+    PiecewiseLinearConstraint *pickSplitPLConstraintBasedOnInfluence();
 };
 
 #endif // __Engine_h__

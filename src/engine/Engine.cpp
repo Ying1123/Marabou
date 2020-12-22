@@ -55,6 +55,8 @@ Engine::Engine()
     , _milpEncoder( nullptr )
 {
     _smtCore.setStatistics( &_statistics );
+    _smtCore.setInfleunceForSplitting( &_influenceForSplitting );
+
     _tableau->setStatistics( &_statistics );
     _rowBoundTightener->setStatistics( &_statistics );
     _constraintBoundTightener->setStatistics( &_statistics );
@@ -1116,6 +1118,8 @@ bool Engine::processInputQuery( InputQuery &inputQuery, bool preprocess )
                 DivideStrategy::LargestInterval : DivideStrategy::ReLUViolation;
         }
 
+        _influenceForSplitting.initialize(_plConstraints);
+
         struct timespec end = TimeUtils::sampleMicro();
         _statistics.setPreprocessingTime( TimeUtils::timePassed( start, end ) );
     }
@@ -2097,6 +2101,14 @@ PiecewiseLinearConstraint *Engine::pickSplitPLConstraintBasedOnIntervalWidth()
     }
 }
 
+PiecewiseLinearConstraint *Engine::pickSplitPLConstraintBasedOnInfluence()
+{
+    // We push the first unfixed ReLU in the topology order to the _candidatePlConstraints
+    ENGINE_LOG( Stringf( "Using EarliestReLU heuristics..." ).ascii() );
+
+    return _influenceForSplitting.pickSplittingConstraint();
+}
+
 PiecewiseLinearConstraint *Engine::pickSplitPLConstraint()
 {
     ENGINE_LOG( Stringf( "Picking a split PLConstraint..." ).ascii() );
@@ -2106,6 +2118,8 @@ PiecewiseLinearConstraint *Engine::pickSplitPLConstraint()
         candidatePLConstraint = pickSplitPLConstraintBasedOnPolarity();
     else if ( _splittingStrategy == DivideStrategy::EarliestReLU )
         candidatePLConstraint = pickSplitPLConstraintBasedOnTopology();
+    else if ( _splittingStrategy == DivideStrategy::MaxInfluence )
+        candidatePLConstraint = pickSplitPLConstraintBasedOnInfluence();
     else if ( _splittingStrategy == DivideStrategy::LargestInterval &&
               _smtCore.getStackDepth() %
               GlobalConfiguration::INTERVAL_SPLITTING_FREQUENCY == 0 )
@@ -2277,4 +2291,9 @@ void Engine::extractSolutionFromGurobi( InputQuery &inputQuery )
             inputQuery.setSolutionValue( i, assignment[variableName] );
         }
     }
+}
+
+const List<PiecewiseLinearConstraint *> &Engine::getPiecewiseLinearConstraints()
+{
+    return _plConstraints;
 }
