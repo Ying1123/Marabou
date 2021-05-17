@@ -53,7 +53,13 @@ public:
     */
     void updateVariableIndex( unsigned oldIndex, unsigned newIndex );
 
+    void *getSourcePLC();
+
+    void setSourcePLC(const void *sourcePLC);
+
 private:
+    void *_sourcePLC;
+
     /*
       Bound tightening information.
     */
